@@ -9,16 +9,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 let camera, stats;
 let composer, renderer, mixer, clock;
 
 const params = {
 	threshold: 0,
-	strength: 1,
+	strength: 0.25,
 	radius: 0,
-	exposure: 1
+	exposure: 0.5
 };
+let finalComposer;
 
 init();
 
@@ -59,8 +61,8 @@ async function init() {
 	renderer.setPixelRatio(window.devicePixelRatio);
 	renderer.setSize(window.innerWidth, window.innerHeight);
 	renderer.setAnimationLoop(animate);
-	renderer.toneMapping = THREE.ReinhardToneMapping;
 	container.appendChild(renderer.domElement);
+	renderer.toneMapping = THREE.SRGBColorSpace;
 
 	//
 
@@ -72,12 +74,33 @@ async function init() {
 	bloomPass.radius = params.radius;
 
 	const outputPass = new OutputPass();
-
+	
 	composer = new EffectComposer(renderer);
 	composer.addPass(renderScene);
 	composer.addPass(bloomPass);
-	composer.addPass(outputPass);
 
+	composer.renderToScreen = false;
+
+	const mixPass = new ShaderPass(
+		new THREE.ShaderMaterial( {
+			uniforms: {
+				baseTexture: { value: null },
+				bloomTexture: { value: composer.renderTarget2.texture }
+			},
+			vertexShader: document.getElementById( 'vertexshader' ).textContent,
+			fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+			defines: {}
+		} ), 'baseTexture'
+	);
+	mixPass.needsSwap = true;
+
+	finalComposer = new EffectComposer( renderer );
+	finalComposer.addPass( renderScene );
+	finalComposer.addPass( mixPass );
+	finalComposer.addPass( outputPass );
+
+	composer.addPass(outputPass);
+	
 	//
 
 	stats = new Stats();
@@ -102,7 +125,7 @@ async function init() {
 
 	});
 
-	bloomFolder.add(params, 'strength', 0.0, 3.0).onChange(function (value) {
+	bloomFolder.add(params, 'strength', 0.0, 1).onChange(function (value) {
 
 		bloomPass.strength = Number(value);
 
@@ -148,5 +171,9 @@ function animate() {
 	stats.update();
 
 	composer.render();
+
+	renderer.setSize(window.innerWidth, window.innerHeight)
+	composer.setSize(window.innerWidth, window.innerHeight)
+	finalComposer.setSize(window.innerWidth, window.innerHeight)
 
 }
