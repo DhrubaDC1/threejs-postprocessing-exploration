@@ -1,152 +1,62 @@
 import * as THREE from 'three';
-
-import Stats from 'three/addons/libs/stats.module.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { OrbitControls } from 'three/examples/jsm/Addons.js';
 
-let camera, stats;
-let composer, renderer, mixer, clock;
-
-const params = {
-	threshold: 0,
-	strength: 1,
-	radius: 0,
-	exposure: 1
-};
+let camera, renderer, scene, controls;
 
 init();
 
 async function init() {
-	console.log('insideee')
+    console.log('Initializing scene...');
 
+    // Scene setup
+    scene = new THREE.Scene();
 
-	const container = document.getElementById('container');
+    // Camera setup
+    camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+    camera.position.set(-5, 2.5, -3.5);
+    scene.add(camera);
 
-	clock = new THREE.Clock();
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xcccccc,10);
+    scene.add(ambientLight);
 
-	const scene = new THREE.Scene();
+    const pointLight = new THREE.PointLight(0xffffff, 10);
+    camera.add(pointLight);
 
-	camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
-	camera.position.set(- 5, 2.5, - 3.5);
-	scene.add(camera);
+    // Renderer setup
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setAnimationLoop(animate);
+    document.body.appendChild(renderer.domElement);
 
-	scene.add(new THREE.AmbientLight(0xcccccc));
+	// add orbit controls
+	controls = new OrbitControls(camera, renderer.domElement);
+	controls.enableDamping = true;
+	controls.dampingFactor = 0.1;
 
-	const pointLight = new THREE.PointLight(0xffffff, 100);
-	camera.add(pointLight);
+    // Load the GLTF model
+    const loader = new GLTFLoader();
+    loader.load('models/gltf/kid.glb', (gltf) => {
+        const model = gltf.scene;
+		model.scale.set(0.025, 0.025, 0.025);
+        scene.add(model);
+    }, undefined, (error) => {
+        console.error('An error occurred while loading the model:', error);
+    });
 
-	const loader = new GLTFLoader();
-	const gltf = await loader.loadAsync('models/gltf/kid.glb');
-
-
-	const model = gltf.scene;
-	model.scale.set(0.025, 0.025, 0.025);
-	scene.add(model);
-
-	// mixer = new THREE.AnimationMixer(model);
-	// const clip = gltf.animations[0];
-	// mixer.clipAction(clip.optimize()).play();
-
-	//
-
-	renderer = new THREE.WebGLRenderer({ antialias: true });
-	renderer.setPixelRatio(window.devicePixelRatio);
-	renderer.setSize(window.innerWidth, window.innerHeight);
-	renderer.setAnimationLoop(animate);
-	renderer.toneMapping = THREE.ReinhardToneMapping;
-	container.appendChild(renderer.domElement);
-
-	//
-
-	const renderScene = new RenderPass(scene, camera);
-
-	const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-	bloomPass.threshold = params.threshold;
-	bloomPass.strength = params.strength;
-	bloomPass.radius = params.radius;
-
-	const outputPass = new OutputPass();
-
-	composer = new EffectComposer(renderer);
-	composer.addPass(renderScene);
-	composer.addPass(bloomPass);
-	composer.addPass(outputPass);
-
-	//
-
-	stats = new Stats();
-	container.appendChild(stats.dom);
-
-	//
-
-	const controls = new OrbitControls(camera, renderer.domElement);
-	controls.maxPolarAngle = Math.PI * 0.5;
-	controls.minDistance = 3;
-	controls.maxDistance = 8;
-
-	//
-
-	const gui = new GUI();
-
-	const bloomFolder = gui.addFolder('bloom');
-
-	bloomFolder.add(params, 'threshold', 0.0, 1.0).onChange(function (value) {
-
-		bloomPass.threshold = Number(value);
-
-	});
-
-	bloomFolder.add(params, 'strength', 0.0, 3.0).onChange(function (value) {
-
-		bloomPass.strength = Number(value);
-
-	});
-
-	gui.add(params, 'radius', 0.0, 1.0).step(0.01).onChange(function (value) {
-
-		bloomPass.radius = Number(value);
-
-	});
-
-	const toneMappingFolder = gui.addFolder('tone mapping');
-
-	toneMappingFolder.add(params, 'exposure', 0.1, 2).onChange(function (value) {
-
-		renderer.toneMappingExposure = Math.pow(value, 4.0);
-
-	});
-
-	window.addEventListener('resize', onWindowResize);
-
+    window.addEventListener('resize', onWindowResize, false);
 }
 
+// Function to handle window resize
 function onWindowResize() {
-
-	const width = window.innerWidth;
-	const height = window.innerHeight;
-
-	camera.aspect = width / height;
-	camera.updateProjectionMatrix();
-
-	renderer.setSize(width, height);
-	composer.setSize(width, height);
-
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// Animation loop
 function animate() {
-
-	const delta = clock.getDelta();
-
-	// mixer.update(delta);
-
-	stats.update();
-
-	composer.render();
-
+    renderer.render(scene, camera);
 }
