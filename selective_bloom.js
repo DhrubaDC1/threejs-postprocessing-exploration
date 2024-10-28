@@ -10,7 +10,7 @@ import { GUI } from "dat.gui";
 import { BokehPass } from "three/examples/jsm/Addons.js";
 import { AmbientLight } from "three";
 import Stats from "three/examples/jsm/libs/stats.module.js";
-
+let model;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -187,7 +187,7 @@ const bokehParams = {
 // Add BokehPass
 const bokehPass = new BokehPass(scene, camera, bokehParams);
 finalComposer.addPass(bokehPass);
-
+// Function to focus on a specific object
 function focusOnObject(object) {
 	const vector = new THREE.Vector3();
 	object.getWorldPosition(vector);
@@ -195,13 +195,7 @@ function focusOnObject(object) {
 	bokehPass.materialBokeh.uniforms.focus.value = distance;
 }
 
-// Event listener to focus on the first object (the red sphere) for demonstration
-document.addEventListener("keydown", (event) => {
-	if (event.key === "f") {
-		// Press 'f' to focus on the red sphere
-		focusOnObject(sphere);
-	}
-});
+// Check distance and adjust focus
 
 const bokehFolder = gui.addFolder("Depth of Field");
 bokehFolder
@@ -221,7 +215,7 @@ bokehFolder.open();
 
 let mixer;
 loader.load("models/gltf/kid.glb", function (glb) {
-	const model = glb.scene;
+	model = glb.scene;
 	console.log("model", model);
 	model.scale.set(0.025, 0.025, 0.025);
 
@@ -231,8 +225,8 @@ loader.load("models/gltf/kid.glb", function (glb) {
 	const partsFolder = gui.addFolder("Parts");
 	partsFolder.closed = false;
 
-	const darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-	const bloomColorMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red bloom color
+	const darkMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+	const bloomColorMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 }); // Red bloom color
 
 	// Adjust your bloom logic for specific parts
 	partsFolder.add(params, "Eye_left").onChange(function () {
@@ -261,6 +255,22 @@ loader.load("models/gltf/kid.glb", function (glb) {
 	// model.getObjectByName("Object_14").layers.toggle(BLOOM_SCENE);
 });
 
+function checkDistanceAndFocus() {
+	if (model) {
+		const modelPosition = new THREE.Vector3();
+		model.getWorldPosition(modelPosition);
+		const distance = camera.position.distanceTo(modelPosition);
+
+		// Define the minimum distance threshold
+		const minDistance = 20; // Adjust as needed
+
+		// If the camera is within the minimum distance, focus on the model
+		if (distance <= minDistance) {
+			focusOnObject(model);
+		}
+	}
+}
+
 renderer.setAnimationLoop(animate);
 // const clock = new THREE.Clock();
 function animate() {
@@ -273,6 +283,7 @@ function animate() {
 
 	scene.traverse(restoreMaterial);
 	// composer.render();
+	checkDistanceAndFocus();
 	finalComposer.render();
 	// requestAnimationFrame(animate);
 }
